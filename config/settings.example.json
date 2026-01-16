@@ -1,0 +1,51 @@
+{
+  "speech": {
+    "region": "eastus2",
+    "apiKey": "",
+    "enablePrivateEndpoint": false,
+    "privateEndpoint": "",
+    "sttLocales": "en-US,da-DK",
+    "ttsVoice": "en-US-AvaMultilingualNeural",
+    "customVoiceEndpointId": ""
+  },
+  "agent": {
+    "apiUrl": "http://localhost:4000"
+  },
+  "branding": {
+    "primaryColor": "#001f76",
+    "backgroundImage": "https://example.com/path/to/background.jpg",
+    "logoUrl": "/image/logo.png",
+    "logoAlt": "Avatar Demo"
+  },
+  "search": {
+    "enabled": false,
+    "endpoint": "",
+    "apiKey": "",
+    "indexName": ""
+  },
+  "avatar": {
+    "character": "lisa",
+    "style": "casual-sitting",
+    "customized": false,
+    "useBuiltInVoice": false,
+    "autoReconnect": false,
+    "useLocalVideoForIdle": false,
+    "backgroundImage": "",
+    "transparentBackground": false
+  },
+  "ui": {
+    "showSubtitles": false
+  },
+  "conversation": {
+    "continuous": false
+  },
+  "features": {
+    "quickReplyEnabled": false,
+    "quickReplyOptions": [
+      "Let me take a look.",
+      "Let me check.",
+      "One moment, please."
+    ]
+  },
+  "servicesProxyBaseUrl": ""
+}

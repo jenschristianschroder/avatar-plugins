@@ -1,0 +1,20 @@
+{
+  "name": "avatar-agent-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for Azure AI Projects agent operations",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@azure/ai-projects": "^1.0.0",
+    "@azure/identity": "^4.13.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

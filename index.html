@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talking Avatar Chat Demo</title>
+    <link href="./css/styles.css" rel="stylesheet">
+  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+  <script src="./dist/bundle.js"></script>
+</head>
+<body class="intro-mode">
+<div id="preSession" class="pre-session">
+  <div id="preSessionHeader" class="pre-session-header">
+    <img id="preSessionHeaderLogo" src="/image/logo.png" alt="Avatar Experience" />
+    <span id="preSessionHeaderLabel" class="pre-session-header-label"></span>
+  </div>
+  <video class="pre-session-video" src="video/meg-formal-idle.webm" autoplay loop muted playsinline webkit-playsinline></video>
+  <div class="pre-session-content">
+    <div class="pre-session-controls">
+      <button id="startSession" onclick="window.startSession()">Talk to Avatar</button>
+      <div id="preSessionAgentCarousel" class="pre-session-agent-carousel" hidden>
+        <button
+          id="carouselPrevBtn"
+          class="carousel-nav carousel-nav--prev"
+          type="button"
+          aria-label="Previous agent"
+          hidden>
+          <span aria-hidden="true">&#x2039;</span>
+        </button>
+        <div class="carousel-viewport">
+          <div id="carouselTrack" class="carousel-track"></div>
+        </div>
+        <button
+          id="carouselNextBtn"
+          class="carousel-nav carousel-nav--next"
+          type="button"
+          aria-label="Next agent"
+          hidden>
+          <span aria-hidden="true">&#x203A;</span>
+        </button>
+        <div id="carouselIndicators" class="carousel-indicators" hidden></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="loadingSpinner" class="spinner spinner-overlay">
+  <div class="spinner-circle"></div>
+  <div class="spinner-caption">Connecting to Avatar ...</div>
+</div>
+
+<div id="appContent" hidden>
+<div id="header" class="app-header"><img src="/image/logo.png" alt="Avatar Experience" data-default-src="/image/logo.png" data-default-alt="Avatar Experience" /></div><div id="videoContainer" class="video-container" hidden>
+  <div class="video-wrapper">
+    <div id="overlayArea" class="overlay-area">
+      <div id="chatHistory" class="chat-history" contentEditable="true" hidden><strong>Chat history</strong><br/><br/></strong></div>
+    </div>
+    <div id="localVideo" class="local-video" style="width: 0px; height: 0px; visibility: hidden">
+      <video src="video/lisa-casual-sitting-idle.webm" autoplay loop muted playsinline webkit-playsinline></video>
+    </div>
+    <div id="remoteVideo" class="remote-video"></div>
+    <div id="subtitles" class="subtitles"></div>
+    <div id="assistantAttachmentOverlay" class="assistant-attachment-overlay" hidden>
+      <div class="assistant-attachment-overlay__inner"></div>
+    </div>
+    <div class="control-overlay">
+      <div id="chatControls" class="chat-controls" hidden>
+        
+      </div>
+      <div id="sessionButtons" class="session-buttons" hidden>
+        <div class="primary-actions">
+          <button
+            id="microphone"
+            class="icon-button"
+            data-state="inactive"
+            onclick="window.microphone()"
+            disabled
+            title="Start Microphone"
+            aria-label="Start Microphone">
+            <span class="icon icon-default" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
+                <path d="M5 11v1a7 7 0 0 0 14 0v-1" />
+                <path d="M12 21v-3" />
+                <path d="M9 21h6" />
+              </svg>
+            </span>
+            <span class="icon icon-active" aria-hidden="true" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
+                <path d="M5 11v1a7 7 0 0 0 14 0v-1" />
+                <path d="M12 21v-3" />
+                <path d="M9 21h6" />
+                <path d="M3.25 7.75a4.75 4.75 0 0 0 0 8.5" />
+                <path d="M20.75 7.75a4.75 4.75 0 0 1 0 8.5" />
+              </svg>
+            </span>
+            <span class="icon icon-speaking" aria-hidden="true" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="6" y="6" width="12" height="12" rx="1.5" />
+              </svg>
+            </span>
+            <span class="sr-only">Start Microphone</span>
+          </button>
+<button
+          id="textInputToggle"
+          class="icon-button text-input-toggle"
+          type="button"
+          title="Type Message"
+          aria-label="Type Message"
+          aria-pressed="false">
+          <span class="icon" aria-hidden="true">
+            <span class="icon-text">ABC</span>
+          </span>
+          <span class="sr-only">Type Message</span>
+        </button>
+        <div id="userMessageBox"
+          class="user-message-box"
+          role="textbox"
+          aria-label="Type a message and press Enter to send"
+          contentEditable="true"></div>
+          <button
+            id="moreActions"
+            class="icon-button more-actions"
+            type="button"
+            title="More Actions"
+            aria-label="More Actions"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="sessionSecondaryActions">
+            <span class="icon icon-hamburger" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            </span>
+            <span class="icon icon-close" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="5" x2="19" y2="19" />
+                <line x1="19" y1="5" x2="5" y2="19" />
+              </svg>
+            </span>
+            <span class="sr-only">More Actions</span>
+          </button>
+        </div>
+
+        <div id="sessionSecondaryActions" class="session-secondary-actions">
+          <button
+            id="mobileTextInputToggle"
+            class="icon-button text-input-toggle"
+            type="button"
+            title="Type Message"
+            aria-label="Type Message"
+            aria-pressed="false">
+            <span class="icon" aria-hidden="true">
+              <span class="icon-text">ABC</span>
+            </span>
+            <span class="sr-only">Type Message</span>
+          </button>
+
+          <button
+            id="clearChatHistory"
+            class="icon-button"
+            onclick="window.clearChatHistory()"
+            title="Clear Chat History"
+            aria-label="Clear Chat History">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" fill="currentColor" style="width: 20px; height: 20px;">
+                  <g>
+                      
+                      <path d="M14 3v2H4v13.385L5.763 17H20v-7h2v8a1 1 0 0 1-1 1H6.455L2 22.5V4a1 1 0 0 1 1-1h11zm5 0V0h2v3h3v2h-3v3h-2V5h-3V3h3z"></path>
+                  </g>
+              </svg>
+            </span>
+            <span class="sr-only">Clear Chat History</span>
+          </button>
+
+          <button
+            id="copyChatHistory"
+            class="icon-button"
+            onclick="window.copyChatHistory()"
+            title="Copy Chat History"
+            aria-label="Copy Chat History">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </span>
+            <span class="sr-only">Copy Chat History</span>
+          </button>
+
+          <button
+            id="toggleChatHistory"
+            class="icon-button"
+            onclick="window.toggleChatHistory()"
+            title="Show Chat History"
+            aria-label="Show Chat History">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 5.5h14v13H5z" />
+                <path d="M8.5 9h7" />
+                <path d="M8.5 12h7" />
+                <path d="M8.5 15h7" />
+              </svg>
+            </span>
+            <span class="sr-only">Show Chat History</span>
+          </button>
+
+          <button
+            id="stopSession"
+            class="icon-button"
+            onclick="window.stopSession()"
+            disabled
+            title="Close Avatar Session"
+            aria-label="Close Avatar Session">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v10" />
+                <path d="M6.22 6.22a8 8 0 1 0 11.56 0" />
+              </svg>
+            </span>
+            <span class="sr-only">Close Avatar Session</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="textInputBackdrop" class="text-input-backdrop" hidden></div>
+  </div>
+</div>
+</body>
+</html>

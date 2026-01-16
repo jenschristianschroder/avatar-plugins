@@ -1,0 +1,36 @@
+{
+  "id": "innovation-hub",
+  "label": "Innovation Hub Agent",
+  "description": "Innovation Hub specialist providing insights and showcasing innovative solutions",
+  "tags": ["Innovation", "Technology", "Solutions"],
+  "thumbnail": "/plugins/innovation-hub/image/thumbnail.png",
+  "default": false,
+  "languages": ["en-US"],
+  "connection": {
+    "endpoint": "YOUR_AZURE_AI_FOUNDRY_ENDPOINT",
+    "projectId": "YOUR_PROJECT_ID",
+    "agentId": "YOUR_AGENT_ID"
+  },
+  "speech": {
+    "ttsVoice": "en-US-AndrewMultilingualNeural",
+    "sttLocales": "en-US"
+  },
+  "branding": {
+    "primaryColor": "#cecece",
+    "backgroundImage": "/plugins/innovation-hub/image/background.png",
+    "logoUrl": "/plugins/innovation-hub/image/logo.png",
+    "logoAlt": "Innovation Hub Agent"
+  },
+  "avatar": {
+    "character": "harry",
+    "style": "business",
+    "video": "video/harry-business-idle.webm",
+    "localIdleVideo": "video/harry-business-idle.webm",
+    "backgroundImage": "/plugins/innovation-hub/image/background.png",
+    "voice": "en-US-AndrewMultilingualNeural"
+  },
+  "assets": {
+    "clientEntry": "/plugins/innovation-hub/plugin.js",
+    "clientStyle": "/plugins/innovation-hub/styles.css"
+  }
+}

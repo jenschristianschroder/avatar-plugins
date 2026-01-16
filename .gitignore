@@ -1,0 +1,8 @@
+config/settings.local.json
+config/settings.json
+config/settings.dev.json
+node_modules
+dist
+/plugins/*/manifest.json
+/plugins/*/INSTRUCTIONS.md
+/debug-mask-test

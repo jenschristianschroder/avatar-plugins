@@ -1,0 +1,30 @@
+{
+  "name": "avatar",
+  "version": "1.0.0",
+  "description": "This sample demonstrates the basic usage of Azure text-to-speech avatar real-time API.",
+  "main": "sample-code.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:container": "node scripts/start-container.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/ai-projects": "^1.0.0",
+    "@azure/identity": "^4.13.0",
+    "adaptivecards": "^3.0.5",
+    "body-parser": "^2.2.0",
+    "express": "^5.1.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/preset-env": "^7.28.3",
+    "babel-loader": "^10.0.0",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "webpack": "^5.102.1",
+    "webpack-cli": "^6.0.1"
+  }
+}

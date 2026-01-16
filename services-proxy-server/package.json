@@ -1,0 +1,24 @@
+{
+  "name": "avatar-services-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server exposing runtime configuration and service relay endpoints for the avatar UI",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.5.0",
+    "@azure/storage-blob": "^12.25.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.1",
+    "formidable": "^3.5.2",
+    "http-proxy-middleware": "^3.0.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

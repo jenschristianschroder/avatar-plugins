@@ -1,9 +1,9 @@
 Param(
     [string]$Registry = "avatarregistry.azurecr.io",
-    [string]$ImageName = "avatar-app",
+    [string]$ImageName = "avatar-app-hub",
     [string]$Tag = "latest",
     [string]$ResourceGroupName = "avatar-demo",
-    [string]$ContainerAppName = "avatar-app",
+    [string]$ContainerAppName = "avatar-app-hub",
     [switch]$Dev,
     [switch]$CreateNewRevision,
     [switch]$WaitForRevision,
@@ -94,6 +94,9 @@ function Resolve-DevEnvironmentVariables {
         @{ Env = "STT_LOCALES"; Path = @("speech", "sttLocales") }
         @{ Env = "TTS_VOICE"; Path = @("speech", "ttsVoice") }
         @{ Env = "CUSTOM_VOICE_ENDPOINT_ID"; Path = @("speech", "customVoiceEndpointId") }
+        @{ Env = "USE_MANAGED_IDENTITY"; Path = @("speech", "useManagedIdentity") }
+        @{ Env = "SPEECH_RESOURCE_ID"; Path = @("speech", "speechResourceId") }
+        @{ Env = "SPEECH_ENDPOINT"; Path = @("speech", "speechEndpoint") }
         @{ Env = "AZURE_AI_FOUNDRY_ENDPOINT"; Path = @("agent", "endpoint") }
         @{ Env = "AZURE_AI_FOUNDRY_AGENT_ID"; Path = @("agent", "agentId") }
         @{ Env = "AZURE_AI_FOUNDRY_PROJECT_ID"; Path = @("agent", "projectId") }

@@ -3079,10 +3079,22 @@ async function connectAvatar() {
         }
 
         const effectiveRegion = (session.region && session.region.trim()) || speechRegion
+        const useManagedIdentity = Boolean(session.useManagedIdentity)
+        const speechEndpoint = (session.speechEndpoint ?? '').trim()
+
         const speechSynthesisConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
-        const ttsEndpoint = privateEndpointEnabled
-            ? `wss://${privateEndpoint}/tts/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
-            : `wss://${effectiveRegion}.tts.speech.microsoft.com/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
+
+        // When using Managed Identity, the custom domain endpoint is required for
+        // Entra ID (AAD) token authentication. Regional endpoints don't support AAD tokens.
+        let ttsEndpoint
+        if (useManagedIdentity && speechEndpoint) {
+            const normalizedEndpoint = speechEndpoint.replace(/^https?:\/\//, '')
+            ttsEndpoint = `wss://${normalizedEndpoint}/tts/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
+        } else if (privateEndpointEnabled) {
+            ttsEndpoint = `wss://${privateEndpoint}/tts/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
+        } else {
+            ttsEndpoint = `wss://${effectiveRegion}.tts.speech.microsoft.com/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
+        }
         speechSynthesisConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_Endpoint, ttsEndpoint)
         speechSynthesisConfig.endpointId = getRuntimeString('speech', 'customVoiceEndpointId', getDomInputValue('customVoiceEndpointId'))
 
@@ -3119,9 +3131,15 @@ async function connectAvatar() {
         }
 
         const speechRecognitionConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
-        const sttEndpoint = privateEndpointEnabled
-            ? `wss://${privateEndpoint}/stt/speech/universal/v2`
-            : `wss://${effectiveRegion}.stt.speech.microsoft.com/speech/universal/v2`
+        let sttEndpoint
+        if (useManagedIdentity && speechEndpoint) {
+            const normalizedEndpoint = speechEndpoint.replace(/^https?:\/\//, '')
+            sttEndpoint = `wss://${normalizedEndpoint}/stt/speech/universal/v2`
+        } else if (privateEndpointEnabled) {
+            sttEndpoint = `wss://${privateEndpoint}/stt/speech/universal/v2`
+        } else {
+            sttEndpoint = `wss://${effectiveRegion}.stt.speech.microsoft.com/speech/universal/v2`
+        }
         speechRecognitionConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_Endpoint, sttEndpoint)
         speechRecognitionConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, "Continuous")
         const sttLocalesSource = getRuntimeString('speech', 'sttLocales', getDomInputValue('sttLocales') || 'en-US,da-DK')

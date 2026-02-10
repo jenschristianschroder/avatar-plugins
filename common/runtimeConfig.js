@@ -66,7 +66,10 @@ const defaultConfig = {
     privateEndpoint: "",
     sttLocales: "en-US,da-DK",
     ttsVoice: "en-US-AvaMultilingualNeural",
-    customVoiceEndpointId: ""
+    customVoiceEndpointId: "",
+    useManagedIdentity: false,
+    speechResourceId: "",
+    speechEndpoint: ""
   },
   agent: {
     apiUrl: "http://localhost:4000",
@@ -401,6 +404,9 @@ const ENVIRONMENT_MAPPINGS = [
   { env: "STT_LOCALES", path: ["speech", "sttLocales"] },
   { env: "TTS_VOICE", path: ["speech", "ttsVoice"] },
   { env: "CUSTOM_VOICE_ENDPOINT_ID", path: ["speech", "customVoiceEndpointId"] },
+  { env: "USE_MANAGED_IDENTITY", path: ["speech", "useManagedIdentity"], converter: normalizeBoolean },
+  { env: "SPEECH_RESOURCE_ID", path: ["speech", "speechResourceId"] },
+  { env: "SPEECH_ENDPOINT", path: ["speech", "speechEndpoint"] },
   { env: "AGENT_API_URL", path: ["agent", "apiUrl"] },
   { env: "ENABLE_ON_YOUR_DATA", path: ["search", "enabled"], converter: normalizeBoolean },
   { env: "COG_SEARCH_ENDPOINT", path: ["search", "endpoint"] },

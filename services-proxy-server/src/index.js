@@ -3,7 +3,131 @@ import express from "express";
 import cors from "cors";
 import { fileURLToPath } from "url";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { DefaultAzureCredential } from "@azure/identity";
 import { getRuntimeConfig, sanitizeRuntimeConfig } from "../../common/runtimeConfig.js";
+
+// ── Managed Identity token service ──────────────────────────────────────────
+const COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default";
+const TOKEN_REFRESH_MARGIN_MS = 9 * 60 * 1000; // refresh 1 min before 10-min expiry
+const ICE_TOKEN_REFRESH_MS = 23 * 60 * 60 * 1000; // refresh every 23 hours
+
+let miCredential = null;
+let speechTokenCache = null;  // { value, expiresAt }
+let iceTokenCache = null;     // { value, expiresAt }
+
+function getMICredential() {
+  if (!miCredential) {
+    miCredential = new DefaultAzureCredential();
+  }
+  return miCredential;
+}
+
+/**
+ * Get an Entra ID (AAD) token for Cognitive Services and compose it
+ * in the format required by the Speech SDK: aad#{resourceId}#{aadToken}
+ */
+async function getManagedIdentitySpeechToken(speechResourceId) {
+  const now = Date.now();
+  if (speechTokenCache && speechTokenCache.expiresAt > now) {
+    return speechTokenCache.value;
+  }
+
+  console.log("[ManagedIdentity] Fetching new Entra ID token...");
+  const startTime = Date.now();
+  const credential = getMICredential();
+
+  let accessToken;
+  try {
+    accessToken = await credential.getToken(COGNITIVE_SERVICES_SCOPE);
+  } catch (error) {
+    console.error("[ManagedIdentity] Failed to get Entra ID token:", error.message);
+    throw new Error(
+      `Failed to authenticate with DefaultAzureCredential. ` +
+      `Ensure you are logged in via 'az login' (local) or have Managed Identity configured (Azure). ` +
+      `Original error: ${error.message}`
+    );
+  }
+
+  const elapsed = Date.now() - startTime;
+  const compoundToken = `aad#${speechResourceId}#${accessToken.token}`;
+
+  speechTokenCache = { value: compoundToken, expiresAt: now + TOKEN_REFRESH_MARGIN_MS };
+  console.log(`[ManagedIdentity] Token acquired in ${elapsed}ms (expires in ~9 min)`);
+
+  return compoundToken;
+}
+
+/**
+ * Get a raw Entra ID bearer token (without the aad# prefix).
+ */
+async function getRawBearerToken() {
+  const credential = getMICredential();
+  const accessToken = await credential.getToken(COGNITIVE_SERVICES_SCOPE);
+  return accessToken.token;
+}
+
+/**
+ * Exchange an Entra ID token for an STS-issued Speech token.
+ * The ICE relay endpoint does NOT accept raw Entra ID tokens — it requires
+ * a Speech STS token obtained via the issueToken endpoint.
+ */
+async function getStsSpeechToken(speechEndpoint) {
+  const entraToken = await getRawBearerToken();
+  const endpoint = speechEndpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const url = `https://${endpoint}/sts/v1.0/issueToken`;
+
+  console.log("[ManagedIdentity] Exchanging Entra ID token for STS Speech token...");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${entraToken}`,
+      "Content-Length": "0"
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Failed to exchange token via STS: ${response.status} ${response.statusText}. Body: ${body}`);
+  }
+
+  const stsToken = await response.text();
+  console.log(`[ManagedIdentity] STS token acquired (length: ${stsToken.length})`);
+  return stsToken;
+}
+
+/**
+ * Get ICE relay credentials using an STS speech token (for managed identity mode).
+ */
+async function getManagedIdentityIceToken(speechRegion, speechEndpoint) {
+  const now = Date.now();
+  if (iceTokenCache && iceTokenCache.expiresAt > now) {
+    return iceTokenCache.value;
+  }
+
+  console.log("[ManagedIdentity] Fetching ICE relay token...");
+  const stsToken = await getStsSpeechToken(speechEndpoint);
+
+  const url = `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`;
+  console.log(`[ManagedIdentity] ICE relay URL: ${url}`);
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${stsToken}`
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Failed to fetch ICE relay token: ${response.status} ${response.statusText}. Body: ${body}`);
+  }
+
+  const iceToken = await response.json();
+  iceTokenCache = { value: iceToken, expiresAt: now + ICE_TOKEN_REFRESH_MS };
+  console.log(`[ManagedIdentity] ICE relay token acquired (URLs: ${iceToken.Urls?.join(", ")})`);
+  return iceToken;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -105,9 +229,45 @@ function resolveSpeechTokenEndpoint(config) {
 app.post("/speech/token", async (_req, res) => {
   try {
     const config = getRuntimeConfig();
+    const useManagedIdentity = Boolean(config.speech?.useManagedIdentity);
     const apiKey = (config.speech?.apiKey ?? "").trim();
+
+    if (useManagedIdentity) {
+      // ── Managed Identity / Entra ID flow ──
+      const speechResourceId = (config.speech?.speechResourceId ?? "").trim();
+      const speechEndpoint = (config.speech?.speechEndpoint ?? config.speech?.privateEndpoint ?? "").trim();
+      const speechRegion = (config.speech?.region ?? "").trim();
+
+      if (!speechResourceId) {
+        res.status(500).json({ error: "speech.speechResourceId is required when useManagedIdentity is enabled" });
+        return;
+      }
+      if (!speechEndpoint) {
+        res.status(500).json({ error: "speech.speechEndpoint (custom domain) is required when useManagedIdentity is enabled" });
+        return;
+      }
+      if (!speechRegion) {
+        res.status(500).json({ error: "speech.region is required" });
+        return;
+      }
+
+      const compoundToken = await getManagedIdentitySpeechToken(speechResourceId);
+      const iceToken = await getManagedIdentityIceToken(speechRegion, speechEndpoint);
+
+      res.json({
+        speechToken: compoundToken,
+        speechTokenExpiresInSeconds: 540,
+        relay: iceToken,
+        region: speechRegion,
+        useManagedIdentity: true,
+        speechEndpoint: speechEndpoint
+      });
+      return;
+    }
+
+    // ── API key flow (existing behavior) ──
     if (!apiKey) {
-      res.status(500).json({ error: "Speech resource key is not configured" });
+      res.status(500).json({ error: "Speech resource key is not configured and useManagedIdentity is not enabled" });
       return;
     }
 
@@ -499,6 +659,50 @@ if (process.env.SERVE_STATIC !== "false") {
 
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// Health check for Managed Identity authentication
+app.get("/speech/health", async (_req, res) => {
+  try {
+    const config = getRuntimeConfig();
+    const useManagedIdentity = Boolean(config.speech?.useManagedIdentity);
+    if (!useManagedIdentity) {
+      res.json({ status: "ok", authMode: "apiKey", message: "Using API key authentication" });
+      return;
+    }
+
+    const speechResourceId = (config.speech?.speechResourceId ?? "").trim();
+    const speechEndpoint = (config.speech?.speechEndpoint ?? "").trim();
+    const speechRegion = (config.speech?.region ?? "").trim();
+
+    const credential = getMICredential();
+    const accessToken = await credential.getToken(COGNITIVE_SERVICES_SCOPE);
+
+    res.json({
+      status: "healthy",
+      authMode: "managedIdentity",
+      region: speechRegion,
+      endpoint: speechEndpoint,
+      resourceId: speechResourceId ? `${speechResourceId.substring(0, 20)}...` : "",
+      tokenLength: accessToken.token.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      authMode: "managedIdentity",
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Clear cached tokens (for debugging managed identity)
+app.post("/speech/clear-cache", (_req, res) => {
+  speechTokenCache = null;
+  iceTokenCache = null;
+  console.log("[ManagedIdentity] Token cache cleared");
+  res.json({ message: "Token cache cleared" });
 });
 
 app.get("/favicon.ico", (req, res, next) => {

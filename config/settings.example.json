@@ -6,7 +6,10 @@
     "privateEndpoint": "",
     "sttLocales": "en-US,da-DK",
     "ttsVoice": "en-US-AvaMultilingualNeural",
-    "customVoiceEndpointId": ""
+    "customVoiceEndpointId": "",
+    "useManagedIdentity": true,
+    "speechResourceId": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.CognitiveServices/accounts/<resource-name>",
+    "speechEndpoint": "<your-custom-name>.cognitiveservices.azure.com"
   },
   "agent": {
     "apiUrl": "http://localhost:4000"

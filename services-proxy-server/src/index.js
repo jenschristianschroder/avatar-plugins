@@ -12,7 +12,8 @@ const TOKEN_REFRESH_MARGIN_MS = 9 * 60 * 1000; // refresh 1 min before 10-min ex
 const ICE_TOKEN_REFRESH_MS = 23 * 60 * 60 * 1000; // refresh every 23 hours
 
 let miCredential = null;
-let speechTokenCache = null;  // { value, expiresAt }
+let speechTokenCache = null;  // { value, expiresAt } - for aad# compound tokens (unused now)
+let stsTokenCache = null;     // { value, expiresAt } - for plain STS tokens
 let iceTokenCache = null;     // { value, expiresAt }
 
 function getMICredential() {
@@ -68,10 +69,20 @@ async function getRawBearerToken() {
 
 /**
  * Exchange an Entra ID token for an STS-issued Speech token.
- * The ICE relay endpoint does NOT accept raw Entra ID tokens — it requires
- * a Speech STS token obtained via the issueToken endpoint.
+ * Returns a plain JWT token (starting with "eyJ") that the Speech SDK
+ * will NOT parse for resourceId/deploymentId derivation.
+ * 
+ * This is the recommended approach for Avatar sessions with Managed Identity
+ * because compound aad#resourceId#token format can cause the SDK to inject
+ * deploymentId into the WebSocket URL, breaking avatar connections.
  */
 async function getStsSpeechToken(speechEndpoint) {
+  const now = Date.now();
+  if (stsTokenCache && stsTokenCache.expiresAt > now) {
+    console.log("[ManagedIdentity] Using cached STS token");
+    return stsTokenCache.value;
+  }
+
   const entraToken = await getRawBearerToken();
   const endpoint = speechEndpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const url = `https://${endpoint}/sts/v1.0/issueToken`;
@@ -91,7 +102,10 @@ async function getStsSpeechToken(speechEndpoint) {
   }
 
   const stsToken = await response.text();
-  console.log(`[ManagedIdentity] STS token acquired (length: ${stsToken.length})`);
+  
+  // Cache for ~9 minutes (STS tokens have 10-minute lifetime)
+  stsTokenCache = { value: stsToken, expiresAt: now + TOKEN_REFRESH_MARGIN_MS };
+  console.log(`[ManagedIdentity] STS token acquired (length: ${stsToken.length}, cached for ~9 min)`);
   return stsToken;
 }
 
@@ -251,11 +265,20 @@ app.post("/speech/token", async (_req, res) => {
         return;
       }
 
-      const compoundToken = await getManagedIdentitySpeechToken(speechResourceId);
+      // Use a plain STS token instead of the compound aad#resourceId#token format.
+      // The Speech SDK parses aad# tokens and can derive a deploymentId from the
+      // custom domain, which breaks avatar WebSocket connections with:
+      //   "Invalid deploymentId https://....cognitiveservices.azure.com/"
+      // Plain STS tokens (starting with "eyJ") bypass this SDK behavior entirely.
+      const speechStsToken = await getStsSpeechToken(speechEndpoint);
       const iceToken = await getManagedIdentityIceToken(speechRegion, speechEndpoint);
 
+      // Debug: confirm token format - should start with "eyJ" (JWT), NOT "aad#"
+      const tokenPrefix = speechStsToken.substring(0, 10);
+      console.log(`[ManagedIdentity] Token format: starts with '${tokenPrefix}', length: ${speechStsToken.length}`);
+
       res.json({
-        speechToken: compoundToken,
+        speechToken: speechStsToken,
         speechTokenExpiresInSeconds: 540,
         relay: iceToken,
         region: speechRegion,

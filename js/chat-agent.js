@@ -3082,21 +3082,46 @@ async function connectAvatar() {
         const useManagedIdentity = Boolean(session.useManagedIdentity)
         const speechEndpoint = (session.speechEndpoint ?? '').trim()
 
-        const speechSynthesisConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
+        // Debug: log token format and region
+        console.log('[Avatar] Token prefix:', speechToken.substring(0, 10))
+        console.log('[Avatar] Region:', effectiveRegion, '| MI:', useManagedIdentity)
 
-        // When using Managed Identity, the custom domain endpoint is required for
-        // Entra ID (AAD) token authentication. Regional endpoints don't support AAD tokens.
+        // For Managed Identity, the server returns a compound aad#resourceId#token.
+        // SpeechConfig.fromAuthorizationToken() handles this format correctly.
+        // CRITICAL: Do NOT set authorizationToken on the synthesizer/recognizer after
+        // creation — that triggers the SDK to re-parse the token and derive a
+        // deploymentId from the custom domain, causing "Invalid deploymentId" errors.
         let ttsEndpoint
-        if (useManagedIdentity && speechEndpoint) {
-            const normalizedEndpoint = speechEndpoint.replace(/^https?:\/\//, '')
-            ttsEndpoint = `wss://${normalizedEndpoint}/tts/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
-        } else if (privateEndpointEnabled) {
+        if (privateEndpointEnabled && !useManagedIdentity) {
             ttsEndpoint = `wss://${privateEndpoint}/tts/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
-        } else {
+        } else if (!useManagedIdentity) {
             ttsEndpoint = `wss://${effectiveRegion}.tts.speech.microsoft.com/cognitiveservices/websocket/v1?enableTalkingAvatar=true`
         }
-        speechSynthesisConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_Endpoint, ttsEndpoint)
-        speechSynthesisConfig.endpointId = getRuntimeString('speech', 'customVoiceEndpointId', getDomInputValue('customVoiceEndpointId'))
+
+        let speechSynthesisConfig
+        if (useManagedIdentity) {
+            // Use fromAuthorizationToken with the compound aad# token — the SDK
+            // constructs the correct avatar WebSocket URL from the region.
+            speechSynthesisConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
+        } else {
+            speechSynthesisConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
+            speechSynthesisConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_Endpoint, ttsEndpoint)
+        }
+        // Set the TTS voice name on the config (matching reference implementation)
+        const ttsVoice = getRuntimeString('speech', 'ttsVoice', getDomInputValue('ttsVoice') || 'en-US-AvaMultilingualNeural')
+        if (ttsVoice) {
+            speechSynthesisConfig.speechSynthesisVoiceName = ttsVoice
+        }
+        // Custom voice endpoint is for custom neural voice deployments (CNV).
+        // Do NOT set endpointId when using Managed Identity — the SDK interprets
+        // endpointId as deploymentId and injects it into the WebSocket URL, causing
+        // "Invalid deploymentId" errors for avatar sessions.
+        const customVoiceEndpointId = getRuntimeString('speech', 'customVoiceEndpointId', getDomInputValue('customVoiceEndpointId'))
+        if (customVoiceEndpointId && !useManagedIdentity) {
+            speechSynthesisConfig.endpointId = customVoiceEndpointId
+        }
+        console.log('[Avatar] customVoiceEndpointId:', customVoiceEndpointId || '(empty)', '| applied:', Boolean(customVoiceEndpointId && !useManagedIdentity))
+        console.log('[Avatar] ttsVoice:', ttsVoice)
 
         const talkingAvatarCharacter = getRuntimeString('avatar', 'character', getDomInputValue('talkingAvatarCharacter') || 'lisa') || 'lisa'
         const talkingAvatarStyle = getRuntimeString('avatar', 'style', getDomInputValue('talkingAvatarStyle') || 'casual-sitting') || 'casual-sitting'
@@ -3120,7 +3145,10 @@ async function connectAvatar() {
             avatarConfig.backgroundColor = '#FFFFFF00'
         }
         avatarSynthesizer = new SpeechSDK.AvatarSynthesizer(speechSynthesisConfig, avatarConfig)
-        avatarSynthesizer.authorizationToken = speechToken
+        // Do NOT set avatarSynthesizer.authorizationToken here.
+        // The token is already in speechSynthesisConfig via fromAuthorizationToken().
+        // Re-setting it causes the SDK to re-parse aad# tokens and derive a
+        // deploymentId from the custom domain, breaking avatar WebSocket connections.
         avatarSynthesizer.avatarEventReceived = function (s, e) {
             var offsetMessage = ", offset from session start: " + e.offset / 10000 + "ms."
             if (e.offset === 0) {
@@ -3130,23 +3158,28 @@ async function connectAvatar() {
             console.log("Event received: " + e.description + offsetMessage)
         }
 
-        const speechRecognitionConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
         let sttEndpoint
-        if (useManagedIdentity && speechEndpoint) {
-            const normalizedEndpoint = speechEndpoint.replace(/^https?:\/\//, '')
-            sttEndpoint = `wss://${normalizedEndpoint}/stt/speech/universal/v2`
-        } else if (privateEndpointEnabled) {
+        if (privateEndpointEnabled && !useManagedIdentity) {
             sttEndpoint = `wss://${privateEndpoint}/stt/speech/universal/v2`
-        } else {
+        } else if (!useManagedIdentity) {
             sttEndpoint = `wss://${effectiveRegion}.stt.speech.microsoft.com/speech/universal/v2`
         }
-        speechRecognitionConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_Endpoint, sttEndpoint)
+
+        let speechRecognitionConfig
+        if (useManagedIdentity) {
+            // Use fromAuthorizationToken with the compound aad# token
+            speechRecognitionConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
+        } else {
+            speechRecognitionConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(speechToken, effectiveRegion)
+            speechRecognitionConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_Endpoint, sttEndpoint)
+        }
         speechRecognitionConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, "Continuous")
         const sttLocalesSource = getRuntimeString('speech', 'sttLocales', getDomInputValue('sttLocales') || 'en-US,da-DK')
         var sttLocales = sttLocalesSource.split(',')
         var autoDetectSourceLanguageConfig = SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(sttLocales)
         speechRecognizer = SpeechSDK.SpeechRecognizer.FromConfig(speechRecognitionConfig, autoDetectSourceLanguageConfig, SpeechSDK.AudioConfig.fromDefaultMicrophoneInput())
-    speechRecognizer.authorizationToken = speechToken
+        // Do NOT set speechRecognizer.authorizationToken here — same reason as above.
+        // The token is already in speechRecognitionConfig via fromAuthorizationToken().
 
         const agentThreadConfig = getAgentConfiguration()
         if (!agentThreadConfig) {

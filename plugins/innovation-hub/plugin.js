@@ -8,7 +8,7 @@ export class InnovationHubPlugin extends PluginBase {
   }
 
   init() {
-    this.api.log(`Plugin ${this.manifest.name} initialized.`);
+    this.api.log(`Plugin ${this.manifest.label} initialized.`);
   }
 
   destroy() {
